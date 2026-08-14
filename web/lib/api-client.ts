@@ -1,6 +1,16 @@
-import type { NoteEvent, NoteStatus, Session, User } from "../../server/src/types";
+import type {
+  Appointment,
+  NoteEvent,
+  NoteStatus,
+  Session,
+  User,
+} from "../../server/src/types";
 
-export type { NoteEvent, NoteStatus, Session, User };
+export type { Appointment, NoteEvent, NoteStatus, Session, User };
+
+export interface UnmatchedAppointment extends Appointment {
+  suggestedSessionId: string | null;
+}
 
 export interface BoardEntry extends Session {
   hostName: string | null;
@@ -81,5 +91,12 @@ export const api = {
     request<NoteView>(`/notes/${id}/transition`, {
       method: "POST",
       body: JSON.stringify({ to }),
+    }),
+  unmatchedAppointments: () =>
+    request<{ appointments: UnmatchedAppointment[] }>("/appointments/unmatched"),
+  linkAppointment: (id: string, sessionId: string) =>
+    request<{ appointment: Appointment }>(`/appointments/${id}/link`, {
+      method: "POST",
+      body: JSON.stringify({ sessionId }),
     }),
 };

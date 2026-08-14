@@ -6,6 +6,8 @@ import { sessionSecret } from "./auth/session.js";
 import { authRouter } from "./routes/auth.js";
 import { sessionsRouter } from "./routes/sessions.js";
 import { notesRouter } from "./routes/notes.js";
+import { appointmentsRouter } from "./routes/appointments.js";
+import { webhooksRouter } from "./routes/webhooks.js";
 
 /**
  * Maps domain errors to responses. Anything unrecognised becomes a generic 500:
@@ -25,6 +27,11 @@ export function createApp(db: Db) {
   const app = express();
 
   app.disable("x-powered-by");
+
+  // Mounted before the JSON parser so the signature can be checked against the
+  // exact bytes the vendor sent.
+  app.use("/api/webhooks", webhooksRouter(db));
+
   app.use(express.json({ limit: "256kb" }));
   app.use(cookieParser(sessionSecret()));
 
@@ -35,6 +42,7 @@ export function createApp(db: Db) {
   app.use("/api/auth", authRouter(db));
   app.use("/api/sessions", sessionsRouter(db));
   app.use("/api/notes", notesRouter(db));
+  app.use("/api/appointments", appointmentsRouter(db));
 
   app.use("/api", (_req, res) => {
     res.status(404).json({ error: { code: "not_found", message: "Not found." } });

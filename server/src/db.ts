@@ -69,6 +69,17 @@ CREATE TABLE IF NOT EXISTS appointments (
 );
 CREATE INDEX IF NOT EXISTS idx_appointments_unmatched ON appointments (unmatched);
 
+-- Who changed an appointment and why: vendor deliveries and operator actions.
+CREATE TABLE IF NOT EXISTS appointment_events (
+  id             TEXT PRIMARY KEY,
+  appointment_id TEXT NOT NULL,
+  actor_user_id  TEXT NOT NULL,
+  type           TEXT NOT NULL CHECK (type IN ('received','linked','unmatched')),
+  detail         TEXT,
+  at             TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_appointment_events_appt ON appointment_events (appointment_id, at);
+
 -- Idempotency ledger: a delivered event id is processed at most once.
 CREATE TABLE IF NOT EXISTS webhook_events (
   event_id       TEXT PRIMARY KEY,
@@ -92,6 +103,7 @@ export function migrate(db: Db): void {
 export function resetSchema(db: Db): void {
   db.exec(`
     DROP TABLE IF EXISTS webhook_events;
+    DROP TABLE IF EXISTS appointment_events;
     DROP TABLE IF EXISTS appointments;
     DROP TABLE IF EXISTS note_events;
     DROP TABLE IF EXISTS notes;

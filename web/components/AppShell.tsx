@@ -17,6 +17,8 @@ function Chrome() {
   const pathname = usePathname();
   if (!user) return null;
 
+  const oversees = user.role === "supervisor" || user.role === "admin";
+
   return (
     <header className="chrome">
       <div className="chrome-inner">
@@ -25,6 +27,11 @@ function Chrome() {
           <Link href="/" className={pathname === "/" ? "active" : ""}>
             Session board
           </Link>
+          {oversees && (
+            <Link href="/appointments" className={pathname === "/appointments" ? "active" : ""}>
+              Unmatched appointments
+            </Link>
+          )}
         </nav>
         <span className="chrome-user">
           {user.name}
