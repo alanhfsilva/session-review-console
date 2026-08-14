@@ -1,8 +1,8 @@
-export default function HomePage() {
-  return (
-    <main className="shell">
-      <h1>Lakeside Session Review Console</h1>
-      <p>Scaffold running.</p>
-    </main>
-  );
+import { SessionBoard } from "../components/SessionBoard";
+
+// Notes are patient data: never prerendered, never cached.
+export const dynamic = "force-dynamic";
+
+export default function SessionBoardPage() {
+  return <SessionBoard />;
 }

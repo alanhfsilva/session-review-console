@@ -83,6 +83,24 @@ export function migrate(db: Db): void {
   db.exec(SCHEMA);
 }
 
+/**
+ * Rebuilds the schema from scratch. `CREATE TABLE IF NOT EXISTS` cannot add a
+ * column to a database that already exists, so seeding drops first: without
+ * this, an older database file silently keeps an outdated shape and fails at
+ * request time rather than at seed time.
+ */
+export function resetSchema(db: Db): void {
+  db.exec(`
+    DROP TABLE IF EXISTS webhook_events;
+    DROP TABLE IF EXISTS appointments;
+    DROP TABLE IF EXISTS note_events;
+    DROP TABLE IF EXISTS notes;
+    DROP TABLE IF EXISTS sessions;
+    DROP TABLE IF EXISTS users;
+  `);
+  migrate(db);
+}
+
 export function openDatabase(path: string): Db {
   if (path !== ":memory:") {
     mkdirSync(dirname(resolve(path)), { recursive: true });

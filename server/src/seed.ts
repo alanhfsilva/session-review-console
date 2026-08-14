@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { randomUUID } from "node:crypto";
 import { join } from "node:path";
 import { z } from "zod";
-import { inTransaction, type Db } from "./db.js";
+import { inTransaction, resetSchema, type Db } from "./db.js";
 import { DEMO_PASSWORD, hashPassword } from "./auth/passwords.js";
 
 /**
@@ -71,16 +71,11 @@ export function seedDatabase(db: Db, fixturesDir: string): SeedCounts {
     }
   }
 
-  inTransaction(db, () => {
-    db.exec(`
-      DELETE FROM webhook_events;
-      DELETE FROM appointments;
-      DELETE FROM note_events;
-      DELETE FROM notes;
-      DELETE FROM sessions;
-      DELETE FROM users;
-    `);
+  // Seeding is destructive by contract: it rebuilds the schema so a database
+  // created by an earlier version of the app cannot survive with a stale shape.
+  resetSchema(db);
 
+  inTransaction(db, () => {
     const insertUser = db.prepare(
       `INSERT INTO users (id, name, email, role, password_hash) VALUES (?, ?, ?, ?, ?)`,
     );
