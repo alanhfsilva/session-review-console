@@ -1,0 +1,42 @@
+{
+  "name": "lakeside-session-console",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Session review console for Lakeside Behavioral Health",
+  "scripts": {
+    "setup": "npm install && npm run dev",
+    "seed": "tsx --disable-warning=ExperimentalWarning scripts/seed.ts",
+    "dev:server": "tsx watch --disable-warning=ExperimentalWarning server/src/index.ts",
+    "dev:web": "next dev web",
+    "dev": "npm run seed && concurrently -k -n api,web -c blue,green \"npm:dev:server\" \"npm:dev:web\"",
+    "webhook:demo": "tsx --disable-warning=ExperimentalWarning scripts/post-webhook-samples.ts",
+    "test": "vitest run --config vitest.config.ts",
+    "typecheck": "tsc -p server/tsconfig.json && tsc -p web/tsconfig.json",
+    "build": "next build web"
+  },
+  "engines": {
+    "node": ">=22.5"
+  },
+  "dependencies": {
+    "cookie-parser": "^1.4.7",
+    "express": "^5.2.1",
+    "next": "^16.3.1",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/cookie-parser": "^1.4.10",
+    "@types/express": "^5.0.6",
+    "@types/node": "^26.2.0",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.4",
+    "@types/supertest": "^7.2.1",
+    "concurrently": "^10.0.4",
+    "supertest": "^7.2.2",
+    "tsx": "^4.23.12",
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.10"
+  }
+}
