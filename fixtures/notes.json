@@ -1,0 +1,51 @@
+[
+  {
+    "id": "note_001",
+    "sessionId": "sess_001",
+    "status": "finalized",
+    "content": "Patient reported improved sleep (6-7 hours nightly, up from 4). Continued work on cognitive restructuring around workplace conflict. Affect brighter, no SI/HI. Homework: thought record three times this week. Plan: continue weekly, reassess PHQ-9 next session.",
+    "updatedAt": "2026-08-10T15:10:00.000Z"
+  },
+  {
+    "id": "note_002",
+    "sessionId": "sess_002",
+    "status": "ready",
+    "content": "Session focused on grief following recent family loss. Patient tearful but engaged; described guilt about missed visits. Introduced continuing-bonds framing. No SI/HI. Plan: weekly sessions, revisit sleep hygiene if disruption persists.",
+    "updatedAt": "2026-08-11T16:05:00.000Z"
+  },
+  {
+    "id": "note_003",
+    "sessionId": "sess_003",
+    "status": "draft",
+    "content": "Brief medication check-in. Patient reports tolerating current dose, mild morning nausea resolving. Denies mood change since last adjustment. Draft pending clinician review of side-effect details.",
+    "updatedAt": "2026-08-12T13:58:00.000Z"
+  },
+  {
+    "id": "note_004",
+    "sessionId": "sess_004",
+    "status": "finalized",
+    "content": "Exposure hierarchy reviewed; patient completed two of three planned in-vivo tasks. Reported anxiety peak 7/10 dropping to 3/10 within twenty minutes. No SI/HI. Plan: add driving-on-highway step next week.",
+    "updatedAt": "2026-08-10T17:02:00.000Z"
+  },
+  {
+    "id": "note_005",
+    "sessionId": "sess_005",
+    "status": "draft",
+    "content": "Couples session. Both partners described escalation pattern around finances. Practiced speaker-listener technique in session with moderate success. Draft: needs detail on agreed homework before review.",
+    "updatedAt": "2026-08-12T18:25:00.000Z"
+  },
+  {
+    "id": "note_006",
+    "sessionId": "sess_006",
+    "status": "ready",
+    "content": "Patient presented with increased work stress; reviewed coping skills and boundary setting. Sleep stable. No SI/HI. Plan: continue biweekly, monitor caffeine intake.",
+    "updatedAt": "2026-08-13T15:22:00.000Z"
+  },
+  {
+    "id": "note_007",
+    "sessionId": "sess_007",
+    "status": "draft",
+    "content": "Intake assessment recorded without an assigned clinician of record. Presenting concern: panic episodes over the past three months. Draft awaiting assignment and review.",
+    "updatedAt": "2026-08-13T18:55:00.000Z"
+  }
+]

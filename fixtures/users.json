@@ -1,0 +1,26 @@
+[
+  {
+    "id": "user_clin_1",
+    "name": "Jordan Lee",
+    "email": "jordan.lee@lakeside.example",
+    "role": "clinician"
+  },
+  {
+    "id": "user_clin_2",
+    "name": "Sam Rivera",
+    "email": "sam.rivera@lakeside.example",
+    "role": "clinician"
+  },
+  {
+    "id": "user_sup_1",
+    "name": "Avery Kim",
+    "email": "avery.kim@lakeside.example",
+    "role": "supervisor"
+  },
+  {
+    "id": "user_adm_1",
+    "name": "Riley Chen",
+    "email": "riley.chen@lakeside.example",
+    "role": "admin"
+  }
+]
