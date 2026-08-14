@@ -132,7 +132,11 @@ async function main(): Promise<void> {
     `${rejected.status === 401 ? "ok  " : "WARN"} forged signature rejected\n     ${rejected.status} (expected 401)`,
   );
 
-  console.log("\nSign in as avery.kim@lakeside.example to see the unmatched queue.");
+  console.log(
+    "\nEvent ids here are fixed, so running this again without `npm run seed` first" +
+      "\nreports every delivery as a duplicate. That is the idempotency guard working." +
+      "\n\nSign in as avery.kim@lakeside.example to see the unmatched queue.",
+  );
 }
 
 main().catch((error: unknown) => {
