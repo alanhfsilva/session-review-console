@@ -5,6 +5,7 @@ import { HttpError } from "./types.js";
 import { sessionSecret } from "./auth/session.js";
 import { authRouter } from "./routes/auth.js";
 import { sessionsRouter } from "./routes/sessions.js";
+import { notesRouter } from "./routes/notes.js";
 
 /**
  * Maps domain errors to responses. Anything unrecognised becomes a generic 500:
@@ -33,6 +34,7 @@ export function createApp(db: Db) {
 
   app.use("/api/auth", authRouter(db));
   app.use("/api/sessions", sessionsRouter(db));
+  app.use("/api/notes", notesRouter(db));
 
   app.use("/api", (_req, res) => {
     res.status(404).json({ error: { code: "not_found", message: "Not found." } });

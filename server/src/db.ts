@@ -37,7 +37,9 @@ CREATE TABLE IF NOT EXISTS notes (
   session_id TEXT NOT NULL REFERENCES sessions (id),
   status     TEXT NOT NULL CHECK (status IN ('draft','ready','finalized')),
   content    TEXT NOT NULL,
-  updated_at TEXT NOT NULL
+  updated_at TEXT NOT NULL,
+  -- Bumped on every write so a stale client save is rejected, not merged blindly.
+  version    INTEGER NOT NULL DEFAULT 1
 );
 CREATE INDEX IF NOT EXISTS idx_notes_session ON notes (session_id);
 
