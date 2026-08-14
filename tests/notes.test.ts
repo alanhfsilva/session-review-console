@@ -56,7 +56,9 @@ describe("finalized notes are the record of practice", () => {
   test("rejects content edits after finalize and leaves content untouched", async () => {
     const before = contentOf("note_001");
     const agent = await loginAs(ctx.app, USERS.jordan);
-    const res = await agent.patch("/api/notes/note_001").send({ content: "rewritten after sign" });
+    const res = await agent
+      .patch("/api/notes/note_001")
+      .send({ content: "rewritten after sign", expectedVersion: 1 });
 
     expect(res.status).toBe(409);
     expect(contentOf("note_001")).toBe(before);
@@ -74,7 +76,9 @@ describe("ownership", () => {
   test("a clinician cannot edit another clinician's note", async () => {
     const before = contentOf("note_005");
     const agent = await loginAs(ctx.app, USERS.jordan);
-    const res = await agent.patch("/api/notes/note_005").send({ content: "not mine" });
+    const res = await agent
+      .patch("/api/notes/note_005")
+      .send({ content: "not mine", expectedVersion: 1 });
 
     expect(res.status).toBe(404);
     expect(contentOf("note_005")).toBe(before);
@@ -95,7 +99,9 @@ describe("ownership", () => {
     expect(read.status).toBe(200);
     expect(read.body.permissions.canEdit).toBe(false);
 
-    const write = await agent.patch("/api/notes/note_003").send({ content: "supervisor edit" });
+    const write = await agent
+      .patch("/api/notes/note_003")
+      .send({ content: "supervisor edit", expectedVersion: 1 });
     expect(write.status).toBe(403);
     expect(contentOf("note_003")).not.toBe("supervisor edit");
   });
@@ -110,6 +116,15 @@ describe("ownership", () => {
 });
 
 describe("concurrent edits", () => {
+  test("refuses a save that does not say which version it edited", async () => {
+    const before = contentOf("note_003");
+    const agent = await loginAs(ctx.app, USERS.jordan);
+    const res = await agent.patch("/api/notes/note_003").send({ content: "blind overwrite" });
+
+    expect(res.status).toBe(400);
+    expect(contentOf("note_003")).toBe(before);
+  });
+
   test("a save based on a stale version is rejected instead of overwriting", async () => {
     const agent = await loginAs(ctx.app, USERS.jordan);
     const loaded = await agent.get("/api/notes/note_003");
@@ -135,7 +150,9 @@ describe("traceability", () => {
     const agent = await loginAs(ctx.app, USERS.jordan);
     const before = (await agent.get("/api/notes/note_003")).body.note.updatedAt;
 
-    const saved = await agent.patch("/api/notes/note_003").send({ content: "reviewed and expanded" });
+    const saved = await agent
+      .patch("/api/notes/note_003")
+      .send({ content: "reviewed and expanded", expectedVersion: 1 });
     expect(saved.status).toBe(200);
     expect(saved.body.note.updatedAt).not.toBe(before);
 
@@ -163,7 +180,7 @@ describe("traceability", () => {
 
   test("history survives finalize and stays append-only", async () => {
     const agent = await loginAs(ctx.app, USERS.jordan);
-    await agent.patch("/api/notes/note_002").send({ content: "final wording" });
+    await agent.patch("/api/notes/note_002").send({ content: "final wording", expectedVersion: 1 });
     await agent.post("/api/notes/note_002/transition").send({ to: "finalized" });
 
     const history = (await agent.get("/api/notes/note_002")).body.history;

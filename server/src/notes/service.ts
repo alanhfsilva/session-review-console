@@ -165,12 +165,12 @@ export function updateNoteContent(
   user: User,
   noteId: string,
   content: string,
-  expectedVersion?: number,
+  expectedVersion: number,
 ): NoteView {
   const { row } = loadWritable(db, user, noteId);
   assertEditable(row.status);
 
-  if (expectedVersion !== undefined && expectedVersion !== row.version) {
+  if (expectedVersion !== row.version) {
     throw new HttpError(
       409,
       "version_conflict",

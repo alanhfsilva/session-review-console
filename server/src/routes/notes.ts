@@ -5,9 +5,11 @@ import { HttpError } from "../types.js";
 import { requireAuth } from "../auth/middleware.js";
 import { getNoteView, transitionNote, updateNoteContent } from "../notes/service.js";
 
+// expectedVersion is required: a client that cannot say which version it edited
+// cannot be allowed to overwrite a note it may never have seen.
 const patchSchema = z.object({
   content: z.string().max(20_000),
-  expectedVersion: z.number().int().nonnegative().optional(),
+  expectedVersion: z.number().int().nonnegative(),
 });
 
 const transitionSchema = z.object({
@@ -25,7 +27,13 @@ export function notesRouter(db: Db): Router {
   router.patch("/:id", (req, res, next) => {
     const parsed = patchSchema.safeParse(req.body);
     if (!parsed.success) {
-      next(new HttpError(400, "invalid_request", "A note needs text content to save."));
+      next(
+        new HttpError(
+          400,
+          "invalid_request",
+          "A save needs note content and the version it was based on.",
+        ),
+      );
       return;
     }
 

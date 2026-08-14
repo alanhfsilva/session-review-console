@@ -7,10 +7,17 @@ const MAX_AGE_MS = 8 * 60 * 60 * 1000;
 
 /**
  * Local-only demo default. A real deployment injects SESSION_SECRET from a
- * secrets manager; the fallback exists so `npm run dev` needs no setup.
+ * secrets manager; the fallback exists so `npm run dev` needs no setup, and it
+ * is refused outright in production so the demo value cannot ship by accident.
  */
 export function sessionSecret(): string {
-  return process.env.SESSION_SECRET ?? "lakeside-local-dev-secret";
+  const configured = process.env.SESSION_SECRET;
+  if (configured) return configured;
+
+  if (process.env.NODE_ENV === "production") {
+    throw new Error("SESSION_SECRET must be set in production.");
+  }
+  return "lakeside-local-dev-secret";
 }
 
 export function issueSession(res: Response, userId: string): void {
