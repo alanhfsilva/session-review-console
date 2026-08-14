@@ -90,6 +90,22 @@ export function openDatabase(path: string): Db {
   return db;
 }
 
+/**
+ * The driver returns untyped rows. These helpers keep the cast in one place so
+ * call sites work with declared row shapes instead of scattering assertions.
+ */
+export function queryAll<Row>(db: Db, sql: string, ...params: SqlValue[]): Row[] {
+  return db.prepare(sql).all(...params) as unknown as Row[];
+}
+
+export function queryOne<Row>(db: Db, sql: string, ...params: SqlValue[]): Row | undefined {
+  return db.prepare(sql).get(...params) as unknown as Row | undefined;
+}
+
+export function execute(db: Db, sql: string, ...params: SqlValue[]): void {
+  db.prepare(sql).run(...params);
+}
+
 /** Runs `fn` in a transaction, rolling back if it throws. */
 export function inTransaction<T>(db: Db, fn: () => T): T {
   db.exec("BEGIN");
