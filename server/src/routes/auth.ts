@@ -3,7 +3,7 @@ import { z } from "zod";
 import type { Db } from "../db.js";
 import { HttpError } from "../types.js";
 import { findUserCredentialsByEmail } from "../users/repository.js";
-import { verifyPassword } from "../auth/passwords.js";
+import { DUMMY_PASSWORD_HASH, verifyPassword } from "../auth/passwords.js";
 import { clearSession, issueSession } from "../auth/session.js";
 import { requireAuth } from "../auth/middleware.js";
 
@@ -25,9 +25,11 @@ export function authRouter(db: Db): Router {
     const email = parsed.data.email.trim().toLowerCase();
     const found = findUserCredentialsByEmail(db, email);
 
-    // One generic failure for unknown email and wrong password: the response
-    // must not tell an attacker which staff addresses exist.
-    if (!found || !verifyPassword(parsed.data.password, found.passwordHash)) {
+    // One generic failure for unknown email and wrong password, and the hash
+    // runs either way: neither the response body nor the time it takes may
+    // tell an attacker which staff addresses exist.
+    const hash = found?.passwordHash ?? DUMMY_PASSWORD_HASH;
+    if (!verifyPassword(parsed.data.password, hash) || !found) {
       next(new HttpError(401, "invalid_credentials", "Email or password is incorrect."));
       return;
     }

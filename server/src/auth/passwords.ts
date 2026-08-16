@@ -15,6 +15,13 @@ export function hashPassword(password: string): string {
   return `scrypt$${salt}$${hash}`;
 }
 
+/**
+ * Verified against when no user matches the submitted email, so a sign-in
+ * attempt costs the same whether or not the address belongs to staff. Without
+ * it, response times alone disclose which clinicians have accounts.
+ */
+export const DUMMY_PASSWORD_HASH = hashPassword("no-account-for-this-address");
+
 export function verifyPassword(password: string, stored: string): boolean {
   const [scheme, salt, hash] = stored.split("$");
   if (scheme !== "scrypt" || !salt || !hash) return false;
