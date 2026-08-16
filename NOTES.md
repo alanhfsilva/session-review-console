@@ -81,10 +81,11 @@ Concrete gaps, roughly in the order I would fix them:
    holds for current browsers, but a same-site subdomain takeover or a browser that treats Lax
    loosely would allow a forged `POST /api/notes/:id/transition` from a logged-in clinician's
    browser. A per-session token on mutating requests is the fix.
-2. **No rate limiting anywhere.** `/api/auth/login` will accept unlimited attempts. scrypt makes
-   each guess expensive and the response reveals nothing about which emails exist, but a patient
-   attacker with a common-password list is unimpeded. Same for the webhook endpoint: valid
-   signatures are cheap to check, invalid ones are not throttled.
+2. **No rate limiting anywhere.** `/api/auth/login` will accept unlimited attempts. Every attempt
+   costs a scrypt hash, and unknown emails are hashed against a dummy so neither the response body
+   nor its timing separates a real address from a fake one, but a patient attacker with a
+   common-password list is unimpeded. Same for the webhook endpoint: valid signatures are cheap to
+   check, invalid ones are not throttled.
 3. **Sign-out cannot revoke a stolen cookie.** There is no server-side session store, so signing out
    clears the browser's cookie but a copy captured beforehand stays valid until its eight-hour
    absolute expiry. There is also no idle timeout, so an unlocked shared workstation stays signed in
@@ -102,15 +103,19 @@ Concrete gaps, roughly in the order I would fix them:
    reconcilable, and the unmatched queue works, but a clinician looking at the board cannot see that
    an appointment for a session was cancelled or moved. That information currently only exists in
    the `appointments` table.
-8. **The unmatched queue only links.** There is no dismiss-with-reason action, so an appointment that
-   is genuinely junk stays in the queue forever. Nothing removes it except a link.
+8. **The unmatched queue only links, and linking is one way.** There is no dismiss-with-reason
+   action, so a genuinely junk appointment sits in the queue forever. Worse, attaching is final:
+   the API refuses to move an already-linked appointment, so a supervisor who picks the wrong
+   session cannot correct it from the console. That trade buys the guarantee that one vendor
+   appointment never claims two sessions, but an unlink action, audited like the link, is the
+   missing half.
 9. **The unassigned session is a dead end.** `sess_007` has a draft note that nobody can edit: no
    clinician owns it and oversight roles cannot author. There is no UI to assign a clinician, so
    that note cannot progress. This is the honest consequence of the ownership rule, not an accident,
    but the assignment screen is missing.
 10. **No pagination or filtering.** The board returns every session in one query. Correct for eight
     seeded rows, unusable at a real practice's volume.
-11. **No automated frontend tests.** The 45 tests cover the API and domain rules. Client behaviour,
+11. **No automated frontend tests.** The 52 tests cover the API and domain rules. Client behaviour,
     including the failed-save and conflict banners, was verified by hand in a browser at desktop and
     mobile widths.
 12. **`npm run seed` is destructive by design.** It drops and rebuilds the schema, because
@@ -120,22 +125,25 @@ Concrete gaps, roughly in the order I would fix them:
 
 ## 4. Production plan
 
-**Deployment.** Containerise the API and run it on ECS Fargate in private subnets behind an ALB;
-serve the built client from S3 through CloudFront. Replace SQLite with RDS for PostgreSQL
-(Multi-AZ), which the repository boundary already isolates: queries are confined to the service
-modules. Secrets (session key, webhook secret, database credentials) come from Secrets Manager, and
-the app already refuses to start in production without them. Terraform for infrastructure,
-migrations gated in the deploy pipeline, images scanned before promotion.
+**Shape of the deployment.** Package the API as a container on AWS (Amazon Web Services) Fargate,
+which runs containers without servers to patch, on a private network behind a load balancer that
+terminates HTTPS. Serve the client from S3 (Amazon's file storage) through CloudFront, its content
+delivery network. Swap SQLite for RDS PostgreSQL, a managed database, with a warm standby in a
+second data centre. Secrets come from AWS Secrets Manager; the app already refuses to start in
+production without them. Only the database module changes.
 
-**HIPAA, once the data is real.** Sign a BAA with AWS and use only in-scope services. Encrypt in
-transit (TLS 1.2+ end to end, including ALB to task) and at rest (KMS customer-managed keys on RDS,
-S3 and backups). No PHI in logs, URLs, or metrics: the app already keeps note content out of logs
-and returns generic error bodies, and that needs enforcing in CI, not just convention. Access
-control moves to an IdP with SSO, MFA for all staff, short sessions with idle timeout, and
-server-side revocation. Audit logging becomes a hard requirement and must cover reads as well as
-writes, shipped to an append-only store (CloudTrail plus an application audit stream to S3 Object
-Lock) with retention of at least six years. Automated backups with tested restores and a documented
-RPO/RTO. Least-privilege IAM per task role, VPC endpoints so traffic avoids the public internet, and
-GuardDuty plus Config for monitoring. Operationally: workforce training, an incident response and
-breach notification runbook, annual risk assessment, and BAAs with any downstream vendor, starting
-with the scheduling system that sends the webhook.
+**Rough cost.** For one practice, expect $250 to $350 a month: about half is the standby database,
+the rest is two small containers, the load balancer, backups and logs. Dropping the standby halves
+that line but turns a failover into a restore measured in hours. Worth paying, but as a deliberate
+choice rather than a default.
+
+**What HIPAA adds.** HIPAA is the American law protecting patient health information, and it turns
+several of the gaps above into obligations. Sign a Business Associate Agreement (BAA) with AWS, and
+another with the scheduling vendor, then use only services those agreements cover. Encrypt in
+transit and at rest, backups included. Keep patient data out of logs, URLs and metrics, and enforce
+that in the build rather than by habit. Replace the demo password map with single sign-on and
+multi-factor authentication, with short sessions the practice can revoke centrally. Record who
+*read* a chart, not only who changed one, into storage nobody can rewrite, kept for six years.
+Add tested restores, least-privilege access, an annual risk assessment, and a written
+breach-notification procedure. Much of this is process rather than code, and the process is the part
+that takes months.
