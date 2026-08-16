@@ -65,6 +65,8 @@ CREATE TABLE IF NOT EXISTS appointments (
   service_type     TEXT,
   session_id       TEXT REFERENCES sessions (id),
   unmatched        INTEGER NOT NULL DEFAULT 0,
+  -- Vendor clock of the last applied event, used to drop out-of-order deliveries.
+  occurred_at      TEXT,
   updated_at       TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_appointments_unmatched ON appointments (unmatched);

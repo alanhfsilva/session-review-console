@@ -17,6 +17,7 @@ interface AppointmentRow {
   service_type: string | null;
   session_id: string | null;
   unmatched: number;
+  occurred_at: string | null;
   updated_at: string;
 }
 
@@ -61,11 +62,33 @@ function recordAppointmentEvent(
 }
 
 /**
+ * True only when the delivery is provably older than the state we hold.
+ *
+ * Equal timestamps are applied: a vendor batching two changes into the same
+ * clock tick is far more likely than a reordered delivery, and silently
+ * dropping a cancellation that shares a timestamp with its create would leave a
+ * cancelled slot showing as booked.
+ */
+function isStale(storedOccurredAt: string | null, incomingOccurredAt: string): boolean {
+  if (!storedOccurredAt) return false;
+
+  const stored = Date.parse(storedOccurredAt);
+  const incoming = Date.parse(incomingOccurredAt);
+  // An unparseable clock tells us nothing; apply the event rather than guess.
+  if (Number.isNaN(stored) || Number.isNaN(incoming)) return false;
+
+  return incoming < stored;
+}
+
+/**
  * Applies one delivery from the scheduling vendor.
  *
  * The event id is the idempotency key: a redelivery (vendors retry on timeout)
- * is acknowledged without repeating any side effect. Appointments are stored as
- * a projection of vendor data and never write clinical note content.
+ * is acknowledged without repeating any side effect. Deliveries also arrive out
+ * of order, so an event older than the state we hold is acknowledged and
+ * dropped rather than applied: otherwise a late create resurrects a cancelled
+ * appointment. Appointments are a projection of vendor data and never write
+ * clinical note content.
  */
 export function handleAppointmentEvent(db: Db, event: AppointmentEvent): HandleResult {
   const seen = queryOne<{ event_id: string }>(
@@ -79,6 +102,27 @@ export function handleAppointmentEvent(db: Db, event: AppointmentEvent): HandleR
   const at = new Date().toISOString();
 
   return inTransaction(db, () => {
+    const existing = queryOne<AppointmentRow>(
+      db,
+      `SELECT * FROM appointments WHERE id = ?`,
+      appt.id,
+    );
+
+    if (existing && isStale(existing.occurred_at, event.occurredAt)) {
+      // Recorded in the ledger so the vendor never redelivers it, but no field
+      // of the appointment moves backwards.
+      recordAppointmentEvent(db, appt.id, WEBHOOK_ACTOR, "received", `${event.type} (stale)`, at);
+      execute(
+        db,
+        `INSERT INTO webhook_events (event_id, type, appointment_id, received_at) VALUES (?, ?, ?, ?)`,
+        event.eventId,
+        event.type,
+        appt.id,
+        at,
+      );
+      return "ignored";
+    }
+
     const match = queryOne<{ id: string }>(
       db,
       `SELECT id FROM sessions WHERE external_appt_id = ?`,
@@ -89,8 +133,8 @@ export function handleAppointmentEvent(db: Db, event: AppointmentEvent): HandleR
       db,
       `INSERT INTO appointments
          (id, status, clinician_email, scheduled_at, duration_minutes,
-          patient_initials, service_type, session_id, unmatched, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          patient_initials, service_type, session_id, unmatched, occurred_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
        ON CONFLICT(id) DO UPDATE SET
          status           = excluded.status,
          clinician_email  = excluded.clinician_email,
@@ -104,6 +148,7 @@ export function handleAppointmentEvent(db: Db, event: AppointmentEvent): HandleR
                               WHEN COALESCE(appointments.session_id, excluded.session_id) IS NULL
                               THEN 1 ELSE 0
                             END,
+         occurred_at      = excluded.occurred_at,
          updated_at       = excluded.updated_at`,
       appt.id,
       appt.status,
@@ -114,6 +159,7 @@ export function handleAppointmentEvent(db: Db, event: AppointmentEvent): HandleR
       appt.serviceType ?? null,
       match?.id ?? null,
       match ? 0 : 1,
+      event.occurredAt,
       at,
     );
 

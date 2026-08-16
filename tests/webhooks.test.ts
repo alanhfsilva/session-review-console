@@ -18,13 +18,14 @@ interface EventOptions {
   status?: string;
   clinicianEmail?: string;
   scheduledAt?: string;
+  occurredAt?: string;
 }
 
 function buildEvent(options: EventOptions = {}) {
   return {
     eventId: options.eventId ?? "evt_001",
     type: options.type ?? "appointment.created",
-    occurredAt: "2026-08-14T12:00:00.000Z",
+    occurredAt: options.occurredAt ?? "2026-08-14T12:00:00.000Z",
     appointment: {
       id: options.apptId ?? "appt_seed_001",
       status: options.status ?? "scheduled",
@@ -188,6 +189,60 @@ describe("updates and cancellations", () => {
     );
 
     expect(appointment("appt_seed_001")?.scheduled_at).toBe("2026-08-19T19:30:00.000Z");
+  });
+
+  test("a create delivered after a cancellation does not resurrect the appointment", async () => {
+    await post(
+      buildEvent({
+        eventId: "evt_cancel_first",
+        type: "appointment.cancelled",
+        status: "cancelled",
+        apptId: "appt_order_1",
+        occurredAt: "2026-08-14T13:00:00.000Z",
+      }),
+    );
+
+    const late = await post(
+      buildEvent({
+        eventId: "evt_create_late",
+        type: "appointment.created",
+        status: "scheduled",
+        apptId: "appt_order_1",
+        occurredAt: "2026-08-14T12:00:00.000Z",
+      }),
+    );
+
+    expect(late.status).toBe(200);
+    expect(late.body.result).toBe("ignored");
+    expect(appointment("appt_order_1")?.status).toBe("cancelled");
+  });
+
+  test("a stale delivery is still recorded so the vendor stops retrying it", async () => {
+    await post(
+      buildEvent({ eventId: "evt_new", occurredAt: "2026-08-14T13:00:00.000Z" }),
+    );
+    const stale = buildEvent({ eventId: "evt_old", occurredAt: "2026-08-14T11:00:00.000Z" });
+
+    expect((await post(stale)).body.result).toBe("ignored");
+    expect((await post(stale)).body.result).toBe("duplicate");
+  });
+
+  test("rejects a cancellation whose appointment still says scheduled", async () => {
+    const res = await post(
+      buildEvent({ eventId: "evt_mismatch", type: "appointment.cancelled", status: "scheduled" }),
+    );
+
+    expect(res.status).toBe(400);
+    expect(appointmentCount("appt_seed_001")).toBe(0);
+  });
+
+  test("rejects a create that carries a cancelled appointment", async () => {
+    const res = await post(
+      buildEvent({ eventId: "evt_mismatch_2", type: "appointment.created", status: "cancelled" }),
+    );
+
+    expect(res.status).toBe(400);
+    expect(appointmentCount("appt_seed_001")).toBe(0);
   });
 
   test("a cancellation keeps the link and the history rather than deleting rows", async () => {

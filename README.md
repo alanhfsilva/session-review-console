@@ -90,8 +90,8 @@ Anything unsigned, wrongly signed, tampered with, or stale gets a `401` and writ
 | Field | Type | Notes |
 |-------|------|-------|
 | `eventId` | string | Idempotency key. A redelivery is acknowledged without repeating side effects. |
-| `type` | `appointment.created` \| `appointment.updated` \| `appointment.cancelled` | Anything else is rejected. |
-| `occurredAt` | string | ISO 8601, vendor clock. |
+| `type` | `appointment.created` \| `appointment.updated` \| `appointment.cancelled` | Anything else is rejected. Must agree with `appointment.status`: a cancellation carries `cancelled`, a create or update does not. |
+| `occurredAt` | string | ISO 8601, vendor clock. Used to order deliveries. |
 | `appointment.id` | string | Vendor appointment id, matched against a session's `externalApptId`. |
 | `appointment.status` | `scheduled` \| `rescheduled` \| `cancelled` | |
 | `appointment.clinicianEmail` | string \| null | Optional. |
@@ -100,7 +100,14 @@ Anything unsigned, wrongly signed, tampered with, or stale gets a `401` and writ
 | `appointment.patientInitials` | string \| null | Optional. |
 | `appointment.serviceType` | string \| null | Optional. |
 
-Responses are `200 {"received": true, "eventId": "...", "result": "linked" | "unmatched" | "duplicate"}`.
+Responses are `200 {"received": true, "eventId": "...", "result": "..."}`, where `result` is:
+
+| Result | Meaning |
+|--------|---------|
+| `linked` | Applied, and the appointment is attached to the session carrying its id. |
+| `unmatched` | Applied, but no session claims this appointment id. It waits in the operator queue. |
+| `duplicate` | This `eventId` was processed before. Nothing changed. |
+| `ignored` | Accepted, but the delivery is older than the state already held, so no field was changed. Late deliveries cannot resurrect a cancelled appointment. |
 
 A webhook never writes clinical note content and never changes a note's status.
 
