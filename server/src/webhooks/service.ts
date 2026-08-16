@@ -183,6 +183,17 @@ export function linkAppointmentToSession(
   );
   if (!appointment) throw new HttpError(404, "not_found", "Appointment not found.");
 
+  // Only an appointment sitting in the queue can be attached. Re-attaching a
+  // linked one would move it silently and leave the first session pointing at
+  // an appointment it no longer owns.
+  if (appointment.unmatched !== 1 || appointment.session_id != null) {
+    throw new HttpError(
+      409,
+      "appointment_already_linked",
+      "That appointment is already attached to a session.",
+    );
+  }
+
   const session = queryOne<{ id: string; external_appt_id: string | null }>(
     db,
     `SELECT id, external_appt_id FROM sessions WHERE id = ?`,
@@ -209,6 +220,14 @@ export function linkAppointmentToSession(
       appointmentId,
     );
     execute(db, `UPDATE sessions SET external_appt_id = ? WHERE id = ?`, appointmentId, sessionId);
+    // A vendor appointment belongs to exactly one session. Defensive given the
+    // guard above, but it keeps the invariant true even if data drifts.
+    execute(
+      db,
+      `UPDATE sessions SET external_appt_id = NULL WHERE external_appt_id = ? AND id != ?`,
+      appointmentId,
+      sessionId,
+    );
     recordAppointmentEvent(db, appointmentId, user.id, "linked", `session ${sessionId}`, at);
   });
 

@@ -243,6 +243,36 @@ describe("operator queue", () => {
     expect(audit.some((e) => e.type === "linked" && e.actor_user_id === "user_adm_1")).toBe(true);
   });
 
+  test("refuses to attach an appointment that is already linked", async () => {
+    await post(buildEvent({ eventId: "evt_orphan", apptId: "appt_unknown_999" }));
+    const agent = await loginAs(ctx.app, USERS.admin);
+    await agent.post("/api/appointments/appt_unknown_999/link").send({ sessionId: "sess_008" });
+
+    const second = await agent
+      .post("/api/appointments/appt_unknown_999/link")
+      .send({ sessionId: "sess_003" });
+
+    expect(second.status).toBe(409);
+    expect(appointment("appt_unknown_999")?.session_id).toBe("sess_008");
+  });
+
+  test("never leaves two sessions claiming the same vendor appointment id", async () => {
+    await post(buildEvent({ eventId: "evt_orphan", apptId: "appt_unknown_999" }));
+    const agent = await loginAs(ctx.app, USERS.admin);
+    const res = await agent
+      .post("/api/appointments/appt_unknown_999/link")
+      .send({ sessionId: "sess_008" });
+
+    expect(res.status).toBe(200);
+
+    const claimed = queryAll<{ id: string }>(
+      ctx.db,
+      `SELECT id FROM sessions WHERE external_appt_id = ?`,
+      "appt_unknown_999",
+    );
+    expect(claimed.map((row) => row.id)).toEqual(["sess_008"]);
+  });
+
   test("a clinician cannot attach an appointment to a session", async () => {
     await post(buildEvent({ eventId: "evt_orphan", apptId: "appt_unknown_999" }));
 
