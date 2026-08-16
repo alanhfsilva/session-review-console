@@ -28,6 +28,21 @@ in tests, but keeping them free of Express and SQL means the clinical rules can 
 **The role filter lives in SQL.** A clinician's list query carries `WHERE s.host_email = ?`. Other
 clinicians' rows never leave the database, so a rendering mistake in the client cannot leak them.
 
+**Three write-integrity rules, each enforced in one place.** They exist because the demo-day
+failures are not the ones that hurt later.
+
+- *Notes carry a version.* A save states the version it edited, and a mismatch is a `409` naming the
+  conflict rather than a silent overwrite. Two clinicians on the same note is ordinary in a practice,
+  and the loser of that race must not lose their words: the client keeps the typed text and offers
+  the saved version to compare.
+- *Deliveries are keyed by `eventId`.* Scheduling vendors retry, so the ledger makes processing
+  happen at most once, and the write is one transaction: a delivery that fails partway records
+  nothing, leaving the retry free to succeed. Out-of-order deliveries are dropped by comparing the
+  vendor's `occurredAt`, so a late create cannot resurrect a cancelled appointment.
+- *Status lives in a transition table, not in handlers.* `draft → ready → finalized`, terminal at
+  the end, checked server-side before any write. Status is a domain invariant, so the UI hiding a
+  button is a courtesy, never the control.
+
 **Auth.** Signed httpOnly cookie (`sameSite=lax`), carrying a user id and issue time, with an
 absolute eight-hour lifetime checked server-side. Every request reloads the user from the database,
 so a role is never taken from client-controlled data. Passwords are scrypt hashes with per-user
@@ -115,9 +130,11 @@ Concrete gaps, roughly in the order I would fix them:
    but the assignment screen is missing.
 10. **No pagination or filtering.** The board returns every session in one query. Correct for eight
     seeded rows, unusable at a real practice's volume.
-11. **No automated frontend tests.** The 52 tests cover the API and domain rules. Client behaviour,
-    including the failed-save and conflict banners, was verified by hand in a browser at desktop and
-    mobile widths.
+11. **Client test coverage stops at the note editor.** Of the 62 tests, five render the editor and
+    cover what happens when a save is refused or the server is unreachable: the typed text survives,
+    the error is shown, and success is never implied. Nothing else in the client is tested. The
+    board, the login form and the unmatched queue were checked by hand at desktop and mobile widths,
+    and a regression in their loading or empty states would not fail the suite.
 12. **`npm run seed` is destructive by design.** It drops and rebuilds the schema, because
     `CREATE TABLE IF NOT EXISTS` cannot add a column to an existing database and a half-migrated
     database fails at request time instead of at seed time. There is no incremental migration story:
