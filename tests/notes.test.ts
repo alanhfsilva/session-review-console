@@ -43,6 +43,22 @@ describe("illegal transitions", () => {
     expect(statusOf("note_001")).toBe("finalized");
   });
 
+  test("rejects reopening a finalized note as a draft", async () => {
+    const agent = await loginAs(ctx.app, USERS.jordan);
+    const res = await agent.post("/api/notes/note_001/transition").send({ to: "draft" });
+
+    expect(res.status).toBe(409);
+    expect(statusOf("note_001")).toBe("finalized");
+  });
+
+  test("rejects a transition to the status the note already holds", async () => {
+    const agent = await loginAs(ctx.app, USERS.jordan);
+    const res = await agent.post("/api/notes/note_003/transition").send({ to: "draft" });
+
+    expect(res.status).toBe(409);
+    expect(statusOf("note_003")).toBe("draft");
+  });
+
   test("rejects an unknown target status", async () => {
     const agent = await loginAs(ctx.app, USERS.jordan);
     const res = await agent.post("/api/notes/note_003/transition").send({ to: "archived" });
@@ -116,6 +132,35 @@ describe("ownership", () => {
 });
 
 describe("concurrent edits", () => {
+  test("a seeded note starts at version 1 and each save moves it forward", async () => {
+    const agent = await loginAs(ctx.app, USERS.jordan);
+    expect((await agent.get("/api/notes/note_003")).body.note.version).toBe(1);
+
+    const first = await agent
+      .patch("/api/notes/note_003")
+      .send({ content: "first pass", expectedVersion: 1 });
+    expect(first.body.note.version).toBe(2);
+
+    const second = await agent
+      .patch("/api/notes/note_003")
+      .send({ content: "second pass", expectedVersion: 2 });
+    expect(second.body.note.version).toBe(3);
+  });
+
+  test("a status change also moves the version, so an open editor cannot save over it", async () => {
+    const agent = await loginAs(ctx.app, USERS.jordan);
+    const before: number = (await agent.get("/api/notes/note_003")).body.note.version;
+
+    await agent.post("/api/notes/note_003/transition").send({ to: "ready" });
+
+    const stale = await agent
+      .patch("/api/notes/note_003")
+      .send({ content: "typed while it was still a draft", expectedVersion: before });
+
+    expect(stale.status).toBe(409);
+    expect(stale.body.error.code).toBe("version_conflict");
+  });
+
   test("refuses a save that does not say which version it edited", async () => {
     const before = contentOf("note_003");
     const agent = await loginAs(ctx.app, USERS.jordan);

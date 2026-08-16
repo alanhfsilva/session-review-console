@@ -3,6 +3,8 @@ import request from "supertest";
 import { createTestContext, loginAs, USERS, type TestContext } from "./helpers.js";
 import { signPayload, WEBHOOK_SIGNATURE_HEADER } from "../server/src/webhooks/verify.js";
 import { webhookSecret } from "../server/src/webhooks/secret.js";
+import { handleAppointmentEvent } from "../server/src/webhooks/service.js";
+import { appointmentEventSchema } from "../server/src/webhooks/types.js";
 import { queryAll, queryOne } from "../server/src/db.js";
 
 let ctx: TestContext;
@@ -174,6 +176,25 @@ describe("idempotency", () => {
 
     expect(appointment("appt_seed_001")?.status).toBe("cancelled");
     expect(appointmentCount("appt_seed_001")).toBe(1);
+  });
+});
+
+describe("failed processing", () => {
+  test("a delivery that fails partway is not recorded as processed", () => {
+    // Fault injection: the appointments write is made to fail so the handler
+    // throws mid-transaction. The vendor retries on our 500, and that retry
+    // must find no ledger entry, otherwise the event is lost for good.
+    ctx.db.exec(`DROP TABLE appointments`);
+
+    const event = appointmentEventSchema.parse(buildEvent({ eventId: "evt_boom" }));
+    expect(() => handleAppointmentEvent(ctx.db, event)).toThrow();
+
+    const recorded = queryOne<{ count: number }>(
+      ctx.db,
+      `SELECT COUNT(*) AS count FROM webhook_events WHERE event_id = ?`,
+      "evt_boom",
+    );
+    expect(recorded?.count).toBe(0);
   });
 });
 
