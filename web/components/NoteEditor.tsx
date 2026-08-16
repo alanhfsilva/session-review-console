@@ -28,7 +28,11 @@ export function NoteEditor({ noteId }: { noteId: string }) {
       const res = await api.note(noteId);
       setView(res);
       setDraft(res.note.content);
+      // The reload answered the conflict, so the warning about it must go too:
+      // a stale banner offering "Retry save" invites the clinician to fight a
+      // problem that is already resolved.
       setConflict(false);
+      setSaveError(null);
     } catch (err) {
       setLoadError(
         err instanceof ApiError && err.status === 404
