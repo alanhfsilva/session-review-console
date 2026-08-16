@@ -28,6 +28,14 @@ export function createApp(db: Db) {
 
   app.disable("x-powered-by");
 
+  // Every API response carries patient data or says something about it. None of
+  // it may be held by a browser, a proxy, or a shared workstation's back button.
+  app.use((_req, res, next) => {
+    res.set("Cache-Control", "no-store");
+    res.set("X-Content-Type-Options", "nosniff");
+    next();
+  });
+
   // Mounted before the JSON parser so the signature can be checked against the
   // exact bytes the vendor sent.
   app.use("/api/webhooks", webhooksRouter(db));

@@ -35,6 +35,14 @@ describe("authentication", () => {
     expect(res.status).toBe(401);
   });
 
+  test("tells caches never to keep a response holding patient data", async () => {
+    const agent = await loginAs(ctx.app, USERS.jordan);
+    const res = await agent.get("/api/sessions");
+
+    expect(res.status).toBe(200);
+    expect(res.headers["cache-control"]).toBe("no-store");
+  });
+
   test("never returns the password hash to the client", async () => {
     const agent = await loginAs(ctx.app, USERS.jordan);
     const res = await agent.get("/api/auth/me");
