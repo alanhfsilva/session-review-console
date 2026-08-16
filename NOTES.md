@@ -135,32 +135,36 @@ Concrete gaps, roughly in the order I would fix them:
     the error is shown, and success is never implied. Nothing else in the client is tested. The
     board, the login form and the unmatched queue were checked by hand at desktop and mobile widths,
     and a regression in their loading or empty states would not fail the suite.
-12. **`npm run seed` is destructive by design.** It drops and rebuilds the schema, because
+12. **Event ordering trusts the scheduling vendor's clock.** Deliveries older than the last applied
+    event are acknowledged and dropped, which stops a late create from resurrecting a cancellation.
+    The cost is that a vendor whose clock jumps backwards, after a restart or a daylight-saving
+    slip, would have legitimate updates silently ignored, and nothing in the console shows that it
+    happened. Two events sharing a timestamp are applied in arrival order, so a create and a cancel
+    issued in the same tick still resolve last-write-wins. A vendor sequence number would settle
+    both cases better than a timestamp.
+13. **`npm run seed` is destructive by design.** It drops and rebuilds the schema, because
     `CREATE TABLE IF NOT EXISTS` cannot add a column to an existing database and a half-migrated
     database fails at request time instead of at seed time. There is no incremental migration story:
     a real deployment needs versioned migrations before the first real record exists.
 
 ## 4. Production plan
 
-**Shape of the deployment.** Package the API as a container on AWS (Amazon Web Services) Fargate,
-which runs containers without servers to patch, on a private network behind a load balancer that
-terminates HTTPS. Serve the client from S3 (Amazon's file storage) through CloudFront, its content
-delivery network. Swap SQLite for RDS PostgreSQL, a managed database, with a warm standby in a
-second data centre. Secrets come from AWS Secrets Manager; the app already refuses to start in
-production without them. Only the database module changes.
+**Deployment.** Run the API as a container on AWS (Amazon Web Services) Fargate, which leaves no
+servers to patch, on a private network behind a load balancer terminating HTTPS. Serve the client
+from S3 storage through CloudFront, Amazon's content delivery network. Swap SQLite for RDS
+PostgreSQL, a managed database, with a warm standby. Secrets come from AWS Secrets Manager, and the
+app already refuses to start in production without them. Only the database module changes.
 
-**Rough cost.** For one practice, expect $250 to $350 a month: about half is the standby database,
-the rest is two small containers, the load balancer, backups and logs. Dropping the standby halves
-that line but turns a failover into a restore measured in hours. Worth paying, but as a deliberate
-choice rather than a default.
+**Cost.** Roughly $250 to $350 a month for one practice, about half of it the standby database.
+Dropping the standby halves that line but turns a failover into a restore measured in hours: a
+deliberate choice, not a default.
 
 **What HIPAA adds.** HIPAA is the American law protecting patient health information, and it turns
-several of the gaps above into obligations. Sign a Business Associate Agreement (BAA) with AWS, and
-another with the scheduling vendor, then use only services those agreements cover. Encrypt in
-transit and at rest, backups included. Keep patient data out of logs, URLs and metrics, and enforce
-that in the build rather than by habit. Replace the demo password map with single sign-on and
-multi-factor authentication, with short sessions the practice can revoke centrally. Record who
-*read* a chart, not only who changed one, into storage nobody can rewrite, kept for six years.
-Add tested restores, least-privilege access, an annual risk assessment, and a written
-breach-notification procedure. Much of this is process rather than code, and the process is the part
-that takes months.
+several gaps above into obligations. Sign a Business Associate Agreement (BAA) with AWS and with the
+scheduling vendor, then use only services they cover. Encrypt in transit and at rest, backups
+included. Keep patient data out of logs, URLs and metrics, enforced in the build rather than by
+habit. Replace the demo password map with single sign-on and multi-factor authentication, and
+sessions the practice can revoke centrally. Record who *read* a chart, not only who changed one, in
+storage nobody can rewrite, kept six years. Add tested restores, least-privilege access, an annual
+risk assessment, and a breach-notification procedure. Much of this is process rather than code, and
+the process is what takes months.
